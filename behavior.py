@@ -68,27 +68,34 @@ class Thymio:
 #------------------ Main loop here -------------------------
 
 def main():
-    robot = Thymio()
-
-    sensorHorizontalthread = Thread(target=robot.sens)
+    ####### Threads #######
+    sensorHorizontalthread = Thread(target=robot.sensHorizontal)
     sensorHorizontalthread.daemon = True
     sensorHorizontalthread.start()
 
-    if robot.sensorHorizontalValues[0] > 2500: 
-        robot.drive(200, 0)
-    elif robot.sensorHorizontalValues[4] > 2500:
-        robot.drive(0, 200)
-    else: 
-        robot.drive(200, 200)
-       
+
+    ####### Avoidance behavior #######
+    while True:
+        try: 
+            if robot.sensorHorizontalValues[0] > 2500: 
+                robot.drive(200, 0)
+            elif robot.sensorHorizontalValues[4] > 2500:
+                robot.drive(0, 200)
+            else: 
+                robot.drive(200, 200)
+        except: 
+            sleep(1)
+            print("Setting up...")
 
 #------------------- Main loop end ------------------------
 
 if __name__ == '__main__':
+    robot = Thymio()
     try:
         main()
     except KeyboardInterrupt:
         print("Stopping robot")
+        robot.stop()
         exit_now = True
         sleep(1)
         os.system("pkill -n asebamedulla")
