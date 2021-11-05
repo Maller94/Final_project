@@ -1,25 +1,27 @@
 import sys, pygame
 pygame.init()
 
-size = width, height = 320, 240
-speed = [2, 2]
-black = 0, 0, 0
+WIDTH, HEIGHT = 600, 600
+win = pygame.display.set_mode((WIDTH,HEIGHT))
+pygame.display.set_caption('Robot Simulator')
 
-screen = pygame.display.set_mode(size)
-
-ball = pygame.image.load("intro_ball.gif")
-ballrect = ball.get_rect()
-
-while 1:
+def quit():
     for event in pygame.event.get():
-        if event.type == pygame.QUIT: sys.exit()
+        if event.type == pygame.QUIT:
+            pygame.quit()
 
-    ballrect = ballrect.move(speed)
-    if ballrect.left < 0 or ballrect.right > width:
-        speed[0] = -speed[0]
-    if ballrect.top < 0 or ballrect.bottom > height:
-        speed[1] = -speed[1]
 
-    screen.fill(black)
-    screen.blit(ball, ballrect)
-    pygame.display.flip()
+def main():
+    clock = pygame.time.Clock()
+    # The arena
+    BLUE = (0,0,255)
+    while True:
+        quit()
+        clock.tick(60)
+        # Init white color
+        win.fill((255,255,255))
+        pygame.draw.rect(win,(0,0,255),[10,10,580,580],2)
+        pygame.display.update()
+
+if __name__ == '__main__':
+    main()
