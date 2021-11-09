@@ -1,9 +1,45 @@
 import math
 import shapely
 from shapely.geometry import LinearRing, LineString, Point
-from numpy import sin, cos, pi, sqrt
+from numpy import sin, cos, pi, sqrt as np
 from random import random
 import sys, pygame
+from matplotlib import pyplot as plt
+
+
+####### Q learning ########
+
+# State space
+# s0 - nothing, detect
+# s4 - nothing, detect
+stateSpace = pow(2,2)
+
+# action space
+# - forward
+# - left
+# - right
+actionSpace = 3
+
+Q = np.zeros((stateSpace, actionSpace))
+
+# rewards 
+# forward = 100
+# turn away = 10
+# turn into = -10
+# backward = -100 
+
+"""
+# Set the percent you want to explore
+epsilon = 0.1
+if random.uniform(0, 1) < epsilon:
+    
+    #Explore: select a random action
+
+else:
+
+    #Exploit: select the action with max value (future reward)
+    
+"""
 
 # A prototype simulation of a differential-drive robot with 3 front sensors
 
@@ -111,7 +147,7 @@ for cnt in range(10000):
         print('Stopped due to collission')
         break
         
-    #save robot location and sensor rays and lidar scans for matplotlib
+    #save robot location and sensor rays for matplotlib
     if cnt%50==0:
         robot_pos["x_coord"].append(x)
         robot_pos["y_coord"].append(y)
@@ -125,5 +161,25 @@ for cnt in range(10000):
         robot_pos["s4Y_coord"].append(s4.y)
 
 
-############ PyGames simulator ############
+############ Matplotlib simulator ############
 
+for i in range(len(robot_pos["x_coord"])):
+    plt.axis([-W/2, W/2, -H/2, H/2])
+
+    # robot x,y coordinates
+    plt.plot(robot_pos["x_coord"][i],robot_pos["y_coord"][i], marker='.', markersize=10, color="red")   
+    
+    #mid sensor - 2
+    plt.plot([robot_pos["x_coord"][i], robot_pos["sX_coord"][i]], [robot_pos["y_coord"][i], robot_pos["sY_coord"][i]])
+    
+    #left sensor - 0
+    plt.plot([robot_pos["x_coord"][i], robot_pos["s0X_coord"][i]], [robot_pos["y_coord"][i], robot_pos["s0Y_coord"][i]])
+
+    #right sensor - 4
+    plt.plot([robot_pos["x_coord"][i], robot_pos["s4X_coord"][i]], [robot_pos["y_coord"][i], robot_pos["s4Y_coord"][i]])
+
+
+    plt.pause(0.01)
+    plt.clf()
+
+plt.show()
