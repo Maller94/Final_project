@@ -32,8 +32,8 @@ x = 0.0   # robot position in meters - x direction - positive to the right
 y = 0.0   # robot position in meters - y direction - positive up
 q = 0.0   # robot heading with respect to x-axis in radians 
 
-left_wheel_velocity = 0   # robot left wheel velocity in radians/s
-right_wheel_velocity = 0  # robot right wheel velocity in radians/s
+left_wheel_velocity = 0.3   # robot left wheel velocity in radians/s
+right_wheel_velocity = 0.3 # robot right wheel velocity in radians/s
 # numbers amount to speed 100 in Thymio
 
 # Scalar value 
@@ -69,82 +69,6 @@ def simulationstep():
         y += v_y * simulation_timestep
         q += omega * simulation_timestep
 
-
-####### Q learning ########
-
-# State space
-# s0 - nothing, detect (later)
-# s4 - nothing, detect (later)
-state_list = ['s0_D_s4_ND','s0_ND_s4_ND', 's4_D_s0_ND','s4_D_s0_D']
-stateSpace = pow(2,2)
-
-# action space
-# - forward
-# - backward
-# - left (later)
-# - right (later)
-action_list = ['F','B', 'L', 'R']
-actionSpace = len(action_list)
-
-Q = np.zeros((stateSpace, actionSpace))
-
-lr = 0.9
-gamma = 0.99
-epsilon = 0.1
-
-def get_state(s0,s4):
-    if s0 < 0.2 and s4 > 0.2:
-        return state_list[0]
-    elif s0 < 0.2 and s4 < 0.2: 
-        return state_list[3]
-    elif s0 > 0.2 and s4 < 0.2: 
-        return state_list[2]
-    else: 
-        return state_list[1]
-    
-def do_action(action):
-    global left_wheel_velocity
-    global right_wheel_velocity
-    if action == 'F':
-        left_wheel_velocity = 0.3
-        right_wheel_velocity = 0.3
-    elif action == 'B':
-        left_wheel_velocity = -0.3
-        right_wheel_velocity = -0.3
-    elif action == 'L':
-        left_wheel_velocity = -0.3
-        right_wheel_velocity = 0.3
-    elif action == 'R':
-        left_wheel_velocity = 0.3
-        right_wheel_velocity = -0.3
-
-# state_list = ['s0_D_s4_ND','s0_ND_s4_ND', 's4_D_s0_ND','s4_D_s0_D']
-
-def reward(stateParam,actionParam):
-    if stateParam == 's0_D_s4_ND' and actionParam == 'R':
-        return 10
-    elif stateParam == 's4_D_s0_ND' and actionParam == 'L':
-        return 10
-    elif stateParam == 's0_ND_s4_ND' and actionParam == 'F':
-        return 100
-    elif stateParam == 's0_D_s4_D' and actionParam == 'B':
-        return 10
-    elif stateParam == 's0_ND_s4_ND' and actionParam == 'B':
-        return -100
-    else:
-        return -10
-
-#### Rewards ####
-# forward = 100
-# stop = 10
-# turn away = 10
-# turn into = -10
-# backward = -100 
-
-
-# Simulation loop
-#################
-
 for cnt in range(10000):
 
     #simple single-ray sensor pointing straight forward
@@ -163,56 +87,17 @@ for cnt in range(10000):
     distanceWall4 = np.sqrt((s4.x-x)**2+(s4.y-y)**2) # Distance wall
 
 
-    ##### RF simple controller #####
+    ##### simple controller #####
 
-    # Set the percent you want to explore
-    if random.uniform(0, 1) < epsilon:
-        #Explore: select a random action
-        
-        # select random number based on action list length (is currently 4)
-        rand_num = random.randint(0,3)
-        # get action from action list, based on random number
-        rand_choice = action_list[rand_num]
-       
-        # retrieves the current state based on the sensor output s0 and s4
-        state = get_state(distanceWall0, distanceWall4)
-        # execute action based on the random choice
-        do_action(rand_choice)
-        # retrieve new state based on sensor outputs
-        new_state = get_state(distanceWall0, distanceWall4)
-
-        # Retrieves the index position of the given state
-        state_coord = state_list.index(state) 
-        # Retrieves the index position of the NEW state
-        new_state_coord = state_list.index(new_state)
-        # Calculates the best possible action given in the NEW state space
-        new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
-        # Update Q-table
-        Q[state_coord][rand_num] = Q[state_coord][rand_num] + lr * (reward(state, rand_choice) + gamma * new_q_max - Q[state_coord][rand_num])
-
+    if distanceWall < 0.2:
+        left_wheel_velocity = 0.5
+        right_wheel_velocity = -0.5 
     else:
-        #Exploit: select the action with max value (future reward)
+        left_wheel_velocity = 0.3
+        right_wheel_velocity = 0.3 
 
-        # Retrieves the current state based on the sensor output s0 and s4
-        state = get_state(distanceWall0, distanceWall4)
-        # Retrieves the index position of the given state
-        state_coord = state_list.index(state)
-        # Calculates the best possible action given in a certain state space
-        q_max = np.where(Q[state_coord] == np.max(Q[state_coord]))[0][0]
-        # Execute the most optimal action
-        do_action(action_list[q_max])
-        # Retrieves the new state based on the sensor output of s0 and s4
-        new_state = get_state(distanceWall0, distanceWall4)
-        # Retrieves the index position of the given state
-        new_state_coord = state_list.index(new_state)
-        # Calculates the best possible action given in a NEW state space (after a new action has been executed)
-        new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
-        # Updates the Q-table 
-        Q[state_coord][q_max] = Q[state_coord][q_max] + lr * (reward(state, action_list[q_max]) + gamma * new_q_max - Q[state_coord][q_max])
-
-    #step simulation
+    ################################
     simulationstep()
-
     arena_wall = world.distance(Point(x,y))
 
     #check collision with arena walls 
@@ -255,5 +140,4 @@ for i in range(len(robot_pos["x_coord"])):
     plt.pause(0.01)
     plt.clf()
 
-print(Q)
 plt.show()
