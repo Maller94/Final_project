@@ -56,23 +56,23 @@ epsilon = 0.2
 
 def rSeeker_doAction(action):
     if action == 'F':
-        rSeeker.lw_velocity = 0.5
-        rSeeker.rw_velocity = 0.5
+        rSeeker.lw_velocity = 0.25
+        rSeeker.rw_velocity = 0.25
     elif action == 'B':
-        rSeeker.lw_velocity = -0.3
-        rSeeker.rw_velocity = -0.3
+        rSeeker.lw_velocity = -0.1
+        rSeeker.rw_velocity = -0.1
     elif action == 'L':
-        rSeeker.lw_velocity = -0.3
-        rSeeker.rw_velocity = 0.3
+        rSeeker.lw_velocity = -0.1
+        rSeeker.rw_velocity = 0.1
     elif action == 'R':
-        rSeeker.lw_velocity = 0.3
-        rSeeker.rw_velocity = -0.3
+        rSeeker.lw_velocity = 0.1
+        rSeeker.rw_velocity = -0.1
 
 def reward(stateParam,actionParam):
     if stateParam == 'FO' and actionParam == 'R':
-        return 10
+        return 5
     elif stateParam == 'FO' and actionParam == 'L':
-        return 10
+        return 5
     elif stateParam == 'FO' and actionParam == 'F':
         return 100
     else:
@@ -163,7 +163,6 @@ for cnt in range(10000):
 
     if cnt % 1000 == 0:
         epsilon -= 0.008
-        print(epsilon)
 
     # Set the percent you want to explore
     if random.uniform(0, 1) < epsilon:
@@ -210,14 +209,14 @@ for cnt in range(10000):
 
     ## Controller robot avoid ##
     if rAvoider_G0 < 0.25: 
-        rAvoider.lw_velocity = -5
-        rAvoider.rw_velocity = 5
+        rAvoider.lw_velocity = -4
+        rAvoider.rw_velocity = 4
     elif rAvoider_G1 < 0.25: 
-        rAvoider.lw_velocity = 5
-        rAvoider.rw_velocity = -5
+        rAvoider.lw_velocity = 4
+        rAvoider.rw_velocity = -4
     else:
-        rAvoider.lw_velocity = 0.3
-        rAvoider.rw_velocity = 0.3
+        rAvoider.lw_velocity = 0.2
+        rAvoider.rw_velocity = 0.2
 
     ################################
     simulationstep()
