@@ -17,7 +17,8 @@ def initCamera():
 def capture():
     #we capture to openCV compatible format
     #you might want to increase resolution
-    camera.resolution = (480, 640)
+    res = 640
+    camera.resolution = (480, res)
     camera.framerate = 24
     image = np.empty((640, 480, 3), dtype=np.uint8)
     camera.capture(image, 'bgr')
@@ -31,9 +32,9 @@ def capture():
     full_mask = cv2.inRange(hsvFrame, lower1, upper1)
     red = cv2.bitwise_and(image, image, mask=full_mask)
 
-    right = np.sum(red[:,0:213])
-    mid = np.sum(red[:,213:426])
-    left = np.sum(red[:,426:])
+    right = np.sum(red[:,0:int(res/3)])
+    mid = np.sum(red[:,int(res/3):int(res/3)*2])
+    left = np.sum(red[:,int(res/3)*2:])
 
     maxVal = max([left,right,mid])
 
