@@ -1,41 +1,63 @@
 # this imports the camera
 
 from picamera import PiCamera
-import numpy as np
-import cv2
 from time import sleep
+import numpy as np
+import cv2 as cv2
 
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 #initialize
 
 camera = PiCamera()
 
 def initCamera():
     print("Camera test")
-    np.set_printoptions(threshold=np.inf)
     camera.start_preview()
+    sleep(1)
 
-def testCamera():
-    camera.resolution = (320, 240)
+def capture():
+    #we capture to openCV compatible format
+    #you might want to increase resolution
+    camera.resolution = (480, 640)
     camera.framerate = 24
-    sleep(2)
-    output = np.empty((240, 320, 3), dtype=np.uint8)
-    camera.capture(output, 'rgb')
+    image = np.empty((640, 480, 3), dtype=np.uint8)
+    camera.capture(image, 'bgr')
+    sleep(0.1)
+    # color detection
+    hsvFrame = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
+    
+    # upper boundary RED color range values; Hue (160 - 180)
+    lower1 = np.array([150,100,20])
+    upper1 = np.array([189,255,255])
+    full_mask = cv2.inRange(hsvFrame, lower1, upper1)
+    red = cv2.bitwise_and(image, image, mask=full_mask)
 
-def closeCamera():
+    right = np.sum(red[:,0:213])
+    mid = np.sum(red[:,213:426])
+    left = np.sum(red[:,426:])
+
+    maxVal = max([left,right,mid])
+
+    if right == maxVal:
+        print('right')
+    elif mid == maxVal:
+        print('mid')
+    elif left == maxVal:
+        print('left')
+    else:
+        print('No color detected')
+
+def stopCamera():
     camera.stop_preview()
-
+    
 if __name__ == '__main__':
-    initCamera()
+    # Init camera
     try:
+        initCamera()
         while True:
-            testCamera()
+            capture()
     except KeyboardInterrupt:
         pass
     finally:
-        closeCamera()
-
-    # img = mpimg.imread('out.png')
-    # imgplot = plt.imshow(img)
-    # plt.show()
+        # Stop camera
+        stopCamera()
+    
