@@ -161,7 +161,7 @@ for cnt in range(10000):
     #     rSeeker.lw_velocity = 0.3
     #     rSeeker.rw_velocity = 0.3
 
-    if cnt % 1000 == 0:
+    if cnt % 500 == 0:
         epsilon -= 0.008
 
     # Set the percent you want to explore
@@ -215,8 +215,8 @@ for cnt in range(10000):
         rAvoider.lw_velocity = 4
         rAvoider.rw_velocity = -4
     else:
-        rAvoider.lw_velocity = 0.2
-        rAvoider.rw_velocity = 0.2
+        rAvoider.lw_velocity = 0.15
+        rAvoider.rw_velocity = 0.15
 
     ################################
     simulationstep()
