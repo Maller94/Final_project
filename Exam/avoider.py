@@ -3,7 +3,6 @@ from threading import Thread
 import dbus.mainloop.glib
 import dbus
 from time import sleep
-import matplotlib.pyplot as plt
 import os
 import numpy as np
 import random
@@ -83,46 +82,48 @@ class Thymio:
         self.camera.start_preview()
         sleep(1)
 
-    def capture(self):
-        #we capture to openCV compatible format
+    def colorDetection(self):
         height = 480
         width = 640
         self.camera.resolution = (height, width)
-        
         self.camera.framerate = 24
         image = np.empty((width, height, 3), dtype=np.uint8)
+        #Scalar set to make a greater distinction between left, mid and right
+        scalar = 2
+        # to cancel out all small blobs in the color detection
+        noise = 1000000
+        # boundaries blue
+        lower_range = np.array([90, 80, 20])
+        upper_range = np.array([140, 255, 255])
 
         while True:
             self.camera.capture(image, 'bgr')
-            # color detection
             hsvFrame = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
-            
-            # boundaries blue
-            lower_range = np.array([90, 80, 20])
-            upper_range = np.array([140, 255, 255])
             full_mask = cv2.inRange(hsvFrame, lower_range, upper_range)
             blue = cv2.bitwise_and(image, image, mask=full_mask)
 
+            # To divide the numpy array in three sections
             frameDivider = int(width/3)
-
             right = np.sum(blue[:,0:frameDivider])
             mid = np.sum(blue[:,frameDivider:(frameDivider*2)])
             left = np.sum(blue[:,(frameDivider*2):])
 
+            # find the maxVal
             maxVal = max([left,right,mid])
-            print('')
-            print('left: '+str(left))
-            print('mid:  '+str(mid))
-            print('right:'+str(right))
 
-            if left == maxVal and left > 1.5*mid and left > 1.5*right and maxVal > 1000000:
-                self.enemyDirection = 'right'
-            elif mid == maxVal and mid > 1.5*left and mid > 1.5*right and maxVal > 1000000:
-                self.enemyDirection = 'mid'
-            elif right == maxVal and right > 1.5*mid and right > 1.5*left and maxVal > 1000000:
+            # print('')
+            # print('left: '+str(left))
+            # print('mid:  '+str(mid))
+            # print('right:'+str(right))
+
+            if left == maxVal and left > scalar*mid and left > scalar*right and maxVal > noise:
                 self.enemyDirection = 'left'
+            elif mid == maxVal and mid > scalar*left and mid > scalar*right and maxVal > noise:
+                self.enemyDirection = 'mid'
+            elif right == maxVal and right > scalar*mid and right > scalar*left and maxVal > noise:
+                self.enemyDirection = 'right'
             else:
-                self.enemyDirection = 'None'
+                self.enemyDirection = 'none'
 
     def stopCamera(self):
         self.camera.stop_preview()
@@ -159,6 +160,8 @@ class Thymio:
         # Currently only the error is logged. Maybe interrupt the mainloop here
         print("dbus error: %s" % str(e))
 
+# ------------------ Reinforcement Learning here -------------------------#
+
 # ------------------ Main loop here -------------------------
 
 def main():
@@ -175,27 +178,30 @@ def main():
     infraredCommRecieveThread.daemon = True
     infraredCommRecieveThread.start()
 
-    cameraThread = Thread(target=robot.capture)
+    cameraThread = Thread(target=robot.colorDetection)
     cameraThread.daemon = True
     cameraThread.start()
 
-    while True: 
-        try: 
+    # Controller #
+    while True:
+        try:
+            robot.LED('red') 
             #print("0: " + str(robot.sensorGroundValues[0]))
             #print("1: " + str(robot.sensorGroundValues[1]))
             #print(robot.rx[0])
             #robot.LED()
             ####### Basic behavior #######
-            #print(robot.enemyDirection)
+            # print(robot.enemyDirection)
+
 
             if robot.enemyDirection == 'left':
-                # robot.drive(150,-150)
+                robot.drive(100,-100)
                 print('left')
             elif robot.enemyDirection == 'mid':
-                # robot.drive(0,0)
+                robot.drive(0,0)
                 print('mid')
             elif robot.enemyDirection == 'right':
-                # robot.drive(-150,150)
+                robot.drive(-100,100)
                 print('right')
         except: 
             print("setting up...")
@@ -209,10 +215,15 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("Stopping robot")
         robot.stop()
-        exit_now = True
         sleep(1)
         os.system("pkill -n asebamedulla")
         print("asebamodulla killed")
     finally:
         robot.stopCamera()
+        robot.LED('off')
+        print("Stopping robot")
+        robot.stop()
+        sleep(1)
+        os.system("pkill -n asebamedulla")
+        print("asebamodulla killed")
 
