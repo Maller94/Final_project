@@ -24,7 +24,7 @@ class Thymio:
         #this enables the prox.com communication channels
         self.aseba.SendEventName("prox.comm.enable", [1])
         #This enables the prox.comm rx value to zero, gets overwritten when receiving a value
-        self.aseba.SendEventName("prox.comm.tx",[0])
+        #self.aseba.SendEventName("prox.comm.tx",[0])
         self.camera = PiCamera()
         self.enemyDirection = ''
 
@@ -45,7 +45,6 @@ class Thymio:
             self.sensorGroundValues = prox_ground
 
     def sendInformation(self, number):
-        # TEST IF WHILE TRUE IS NEEDED - DOCUMENTATION SAID IF ENABLED IT SENDS OUT EVERY 100 m/s
         while True: 
             self.aseba.SendEventName("prox.comm.tx", [number])
 
@@ -53,8 +52,31 @@ class Thymio:
         while True: 
             self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
 
-    def LED(self): 
-        self.aseba.SendEventName("leds.prox.h", [1, 2, 3, 4, 5, 6, 7, 8])
+    def LED(self, color): 
+        if color == "red": 
+            self.aseba.SendEventName("leds.bottom.left", (32,0,0))
+            self.aseba.SendEventName("leds.bottom.right", (32,0,0))
+            self.aseba.SendEventName("leds.top", (32,0,0))
+        elif color == "green": 
+            self.aseba.SendEventName("leds.bottom.left", (0,32,0))
+            self.aseba.SendEventName("leds.bottom.right", (0,32,0))
+            self.aseba.SendEventName("leds.top", (0,32,0))
+        elif color == "blue":
+            self.aseba.SendEventName("leds.bottom.left", (0,0,32))
+            self.aseba.SendEventName("leds.bottom.right", (0,0,32))
+            self.aseba.SendEventName("leds.top", (0,0,32))
+        elif color == "yellow": 
+            self.aseba.SendEventName("leds.bottom.left", (32,32,0))
+            self.aseba.SendEventName("leds.bottom.right", (32,32,0))
+            self.aseba.SendEventName("leds.top", (32,32,0))
+        elif color == "purple": 
+            self.aseba.SendEventName("leds.bottom.left", (32,0,32))
+            self.aseba.SendEventName("leds.bottom.right", (32,0,32))
+            self.aseba.SendEventName("leds.top", (32,0,32))
+        else:
+            self.aseba.SendEventName("leds.bottom.left", (0,0,0))
+            self.aseba.SendEventName("leds.bottom.right", (0,0,0))
+            self.aseba.SendEventName("leds.top", (0,0,0))
 
     def initCamera(self):
         print("Camera test")
