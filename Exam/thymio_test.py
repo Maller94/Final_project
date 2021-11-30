@@ -21,7 +21,7 @@ class Thymio:
         #this enables the prox.com communication channels
         self.aseba.SendEventName("prox.comm.enable", [1])
         #This enables the prox.comm rx value to zero, gets overwritten when receiving a value
-        self.aseba.SendEventName("prox.comm.tx",[0])
+        #self.aseba.SendEventName("prox.comm.tx",[0])
 
     def drive(self, left_wheel_speed, right_wheel_speed):
         left_wheel = left_wheel_speed
@@ -46,10 +46,7 @@ class Thymio:
 
     def receiveInformation(self):
         while True: 
-            if self.aseba.GetVariable("thymio-II", "prox.comm.rx") == None: 
-                self.rx = 0
-            else: 
-                self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")
 
     def LED(self): 
         self.aseba.SendEventName("leds.prox.h", [1, 2, 3, 4, 5, 6, 7, 8])
