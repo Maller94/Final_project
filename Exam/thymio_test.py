@@ -94,29 +94,32 @@ class Thymio:
 
         while True:
             self.camera.capture(image, 'bgr')
-            sleep(0.1)
             # color detection
             hsvFrame = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
             
             # boundaries blue
-            lower_range = np.array([105,50,50])
-            upper_range = np.array([110,255,255])
+            lower_range = np.array([90, 80, 20])
+            upper_range = np.array([140, 255, 255])
             full_mask = cv2.inRange(hsvFrame, lower_range, upper_range)
-            red = cv2.bitwise_and(image, image, mask=full_mask)
+            blue = cv2.bitwise_and(image, image, mask=full_mask)
 
             frameDivider = int(width/3)
 
-            right = np.sum(red[:,0:frameDivider])
-            mid = np.sum(red[:,frameDivider:(frameDivider*2)])
-            left = np.sum(red[:,(frameDivider*2):])
+            right = np.sum(blue[:,0:frameDivider])
+            mid = np.sum(blue[:,frameDivider:(frameDivider*2)])
+            left = np.sum(blue[:,(frameDivider*2):])
 
             maxVal = max([left,right,mid])
+            print('')
+            print('left: '+str(left))
+            print('mid:  '+str(mid))
+            print('right:'+str(right))
 
-            if right == maxVal and maxVal > 30000:
+            if left == maxVal and left > 1.5*mid and left > 1.5*right and maxVal > 1000000:
                 self.enemyDirection = 'right'
-            elif mid == maxVal and maxVal > 30000:
+            elif mid == maxVal and mid > 1.5*left and mid > 1.5*right and maxVal > 1000000:
                 self.enemyDirection = 'mid'
-            elif left == maxVal and maxVal > 30000:
+            elif right == maxVal and right > 1.5*mid and right > 1.5*left and maxVal > 1000000:
                 self.enemyDirection = 'left'
             else:
                 self.enemyDirection = 'None'
@@ -183,23 +186,17 @@ def main():
             #print(robot.rx[0])
             #robot.LED()
             ####### Basic behavior #######
-            
-            # if robot.sensorGroundValues[0] < 300:
-            #     robot.drive(-100, 100)
-            # elif robot.sensorGroundValues[1] < 300:
-            #     robot.drive(100, -100)
-            # else:
-            #     robot.drive(200, 200)
-            print(robot.enemyDirection)
+            #print(robot.enemyDirection)
 
             if robot.enemyDirection == 'left':
-                robot.drive(-150,150)
+                # robot.drive(150,-150)
+                print('left')
             elif robot.enemyDirection == 'mid':
-                robot.drive(0,0)
+                # robot.drive(0,0)
+                print('mid')
             elif robot.enemyDirection == 'right':
-                robot.drive(150,-150)
-            
-            sleep(1)
+                # robot.drive(-150,150)
+                print('right')
         except: 
             print("setting up...")
             sleep(1)
