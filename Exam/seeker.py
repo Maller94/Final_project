@@ -89,9 +89,10 @@ class Thymio:
         self.camera.framerate = 24
         image = np.empty((width, height, 3), dtype=np.uint8)
         #Scalar set to make a greater distinction between left, mid and right
-        scalar = 2
+        scalar = 1
         # to cancel out all small blobs in the color detection
-        noise = 1000000
+        noise = 300000
+        noiseCalibration = 200000
         # boundaries blue
         lower_range = np.array([90, 80, 20])
         upper_range = np.array([140, 255, 255])
@@ -104,23 +105,32 @@ class Thymio:
 
             # To divide the numpy array in three sections
             frameDivider = int(width/3)
-            right = np.sum(blue[:,0:frameDivider])
+            left = np.sum(blue[:,0:frameDivider])
             mid = np.sum(blue[:,frameDivider:(frameDivider*2)])
-            left = np.sum(blue[:,(frameDivider*2):])
+            right = np.sum(blue[:,(frameDivider*2):])
 
             # find the maxVal
             maxVal = max([left,right,mid])
 
-            # print('')
-            # print('left: '+str(left))
-            # print('mid:  '+str(mid))
-            # print('right:'+str(right))
+            print('')
+            if left == maxVal:
+                print(f'left: {left} ######')
+                print(f'mid:  {mid}')
+                print(f'right:{right}')
+            elif right == maxVal:
+                print(f'left: {left}')
+                print(f'mid:  {mid}')
+                print(f'right:{right} ######')
+            elif mid == maxVal:
+                print(f'left: {left}')
+                print(f'mid:  {mid} ######')
+                print(f'right:{right}')
 
-            if left == maxVal and left > scalar*mid and left > scalar*right and maxVal > noise:
+            if left == maxVal and maxVal > noise-noiseCalibration:
                 self.enemyDirection = 'left'
-            elif mid == maxVal and mid > scalar*left and mid > scalar*right and maxVal > noise:
+            elif mid == maxVal and maxVal > noise:
                 self.enemyDirection = 'mid'
-            elif right == maxVal and right > scalar*mid and right > scalar*left and maxVal > noise:
+            elif right == maxVal and maxVal > noise+noiseCalibration:
                 self.enemyDirection = 'right'
             else:
                 self.enemyDirection = 'none'
@@ -162,6 +172,40 @@ class Thymio:
 
 # ------------------ Reinforcement Learning here -------------------------#
 
+rSeeker_states = ['left', 'right','mid','none']
+stateSpace = len(rSeeker_states)
+
+rSeeker_actions = ['F','B', 'L', 'R']
+actionSpace = len(rSeeker_actions)
+
+Q = np.zeros((stateSpace, actionSpace))
+
+lr = 0.9
+gamma = 0.99
+epsilon = 0.2
+
+def rSeeker_doAction(action):
+    if action == 'F':
+        robot.drive(250,250)
+    elif action == 'B':
+        robot.drive(-100,-100)
+    elif action == 'L':
+        robot.drive(0,200)
+    elif action == 'R':
+        robot.drive(200,0)
+
+def reward(stateParam,actionParam):
+    if stateParam == 'mid' and actionParam == 'F':
+        return 100
+    elif stateParam == 'left' and actionParam == 'L':
+        return 5
+    elif stateParam == 'right' and actionParam == 'R':
+        return 5
+    else:
+        return -10
+
+
+
 # ------------------ Main loop here -------------------------
 
 def main():
@@ -186,23 +230,54 @@ def main():
     while True:
         try:
             robot.LED('red') 
-            #print("0: " + str(robot.sensorGroundValues[0]))
-            #print("1: " + str(robot.sensorGroundValues[1]))
-            #print(robot.rx[0])
-            #robot.LED()
-            ####### Basic behavior #######
-            # print(robot.enemyDirection)
+            
+            
+            # TASK 1
+            # Decrease epsilon slowly.....
+            # TASK 2
+            # implement basic behavior when detecting tape
 
+            # Set the percent you want to explore
+            if random.uniform(0, 1) < epsilon:
+                #Explore: select a random action
+                # select random number based on action list length (is currently 4)
+                rand_num = random.randint(0,3)
+                # get action from action list, based on random number
+                rand_choice = rSeeker_actions[rand_num]
+                # retrieves the current state based on the sensor output s0 and s4
+                state = robot.enemyDirection
+                # execute action based on the random choice
+                rSeeker_doAction(rand_choice)
+                # retrieve new state based on sensor outputs
+                new_state = robot.enemyDirection
 
-            if robot.enemyDirection == 'left':
-                robot.drive(100,-100)
-                print('left')
-            elif robot.enemyDirection == 'mid':
-                robot.drive(0,0)
-                print('mid')
-            elif robot.enemyDirection == 'right':
-                robot.drive(-100,100)
-                print('right')
+                # Retrieves the index position of the given state
+                state_coord = rSeeker_states.index(state) 
+                # Retrieves the index position of the NEW state
+                new_state_coord = rSeeker_states.index(new_state)
+                # Calculates the best possible action given in the NEW state space
+                new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
+                # Update Q-table
+                Q[state_coord][rand_num] = Q[state_coord][rand_num] + lr * (reward(state, rand_choice) + gamma * new_q_max - Q[state_coord][rand_num])
+
+            else:
+                #Exploit: select the action with max value (future reward)
+                # Retrieves the current state based on the sensor output s0 and s4
+                state = robot.enemyDirection
+                # Retrieves the index position of the given state
+                state_coord = rSeeker_states.index(state)
+                # Calculates the best possible action given in a certain state space
+                q_max = np.where(Q[state_coord] == np.max(Q[state_coord]))[0][0]
+                # Execute the most optimal action
+                rSeeker_doAction(rSeeker_actions[q_max])
+                # Retrieves the new state based on the sensor output of s0 and s4
+                new_state = robot.enemyDirection
+                # Retrieves the index position of the given state
+                new_state_coord = rSeeker_states.index(new_state)
+                # Calculates the best possible action given in a NEW state space (after a new action has been executed)
+                new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
+                # Updates the Q-table 
+                Q[state_coord][q_max] = Q[state_coord][q_max] + lr * (reward(state, rSeeker_actions[q_max]) + gamma * new_q_max - Q[state_coord][q_max])
         except: 
             print("setting up...")
             sleep(1)

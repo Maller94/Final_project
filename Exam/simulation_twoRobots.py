@@ -164,48 +164,6 @@ for cnt in range(10000):
     if cnt % 500 == 0:
         epsilon -= 0.008
 
-    # Set the percent you want to explore
-    if random.uniform(0, 1) < epsilon:
-        #Explore: select a random action
-        # select random number based on action list length (is currently 4)
-        rand_num = random.randint(0,3)
-        # get action from action list, based on random number
-        rand_choice = rSeeker_actions[rand_num]
-       
-        # retrieves the current state based on the sensor output s0 and s4
-        state = found
-        # execute action based on the random choice
-        rSeeker_doAction(rand_choice)
-        # retrieve new state based on sensor outputs
-        new_state = found
-
-        # Retrieves the index position of the given state
-        state_coord = rSeeker_states.index(state) 
-        # Retrieves the index position of the NEW state
-        new_state_coord = rSeeker_states.index(new_state)
-        # Calculates the best possible action given in the NEW state space
-        new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
-        # Update Q-table
-        Q[state_coord][rand_num] = Q[state_coord][rand_num] + lr * (reward(state, rand_choice) + gamma * new_q_max - Q[state_coord][rand_num])
-
-    else:
-        #Exploit: select the action with max value (future reward)
-        # Retrieves the current state based on the sensor output s0 and s4
-        state = found
-        # Retrieves the index position of the given state
-        state_coord = rSeeker_states.index(state)
-        # Calculates the best possible action given in a certain state space
-        q_max = np.where(Q[state_coord] == np.max(Q[state_coord]))[0][0]
-        # Execute the most optimal action
-        rSeeker_doAction(rSeeker_actions[q_max])
-        # Retrieves the new state based on the sensor output of s0 and s4
-        new_state = found
-        # Retrieves the index position of the given state
-        new_state_coord = rSeeker_states.index(new_state)
-        # Calculates the best possible action given in a NEW state space (after a new action has been executed)
-        new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
-        # Updates the Q-table 
-        Q[state_coord][q_max] = Q[state_coord][q_max] + lr * (reward(state, rSeeker_actions[q_max]) + gamma * new_q_max - Q[state_coord][q_max])
 
     ## Controller robot avoid ##
     if rAvoider_G0 < 0.25: 
