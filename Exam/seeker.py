@@ -179,9 +179,14 @@ class Thymio:
 
 
 ## Write q table ##
-def writeQ(q): 
-    with open("seekerQTable.txt", "w") as write: 
-        write.write(q)
+def writeToQ(q):
+    with open('QTableSeeker.txt','w') as w:
+        w.write(str(q))
+
+def readQ():
+    with open('Qtable.txt','r') as r:
+        QtableRead = np.array(r.read())
+    return QtableRead
 
 # ------------------ Reinforcement Learning here -------------------------#
 
@@ -192,6 +197,11 @@ rSeeker_actions = ['F','B', 'L', 'R']
 actionSpace = len(rSeeker_actions)
 
 Q = np.zeros((stateSpace, actionSpace))
+
+if os.stat('QTable.txt').st_size != 0:
+    Q = readQ()
+else:
+    pass
 
 lr = 0.9
 gamma = 0.99
@@ -302,7 +312,7 @@ if __name__ == '__main__':
         print("asebamodulla killed")
     finally:
         print(Q)
-        writeQ(Q)
+        writeToQ(Q)
         robot.stopCamera()
         robot.LED('off')
         print("Stopping robot")
