@@ -33,15 +33,21 @@ class Thymio:
         while True: 
             self.aseba.SendEventName("prox.comm.tx", [number])
 
-    ### ONLY TO BE USED IN AVOIDER ###
     def receiveInformation(self):
         while True: 
+            self.aseba.SendEventName("prox.comm.enable", [1])
+            sleep(0.2)
             if self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [1]:
                 self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
             elif self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [2]:
                 self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
             else: 
                 self.rx = [0]
+            sleep(0.2)
+            self.aseba.SendEventName("prox.comm.enable", [0])
+
+
+            
 
 
 ############## Bus and aseba setup ######################################
@@ -81,7 +87,7 @@ class Thymio:
 #------------------ Main loop here -------------------------
 
 def main():
-    infraredCommSendThread = Thread(target=robot.sendInformation, args=([1])) ## args=(1) = seeker, args=(2) = avoider
+    infraredCommSendThread = Thread(target=robot.sendInformation, args=([2])) ## args=(1) = seeker, args=(2) = avoider
     infraredCommSendThread.daemon = True
     infraredCommSendThread.start()
 
@@ -92,7 +98,8 @@ def main():
 
     try: 
         while True: 
-            print(robot.RX[0])
+            print(robot.rx[0])
+            sleep(0.2)
     except:
         "setting up"
         sleep(1)

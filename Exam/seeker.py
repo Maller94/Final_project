@@ -95,8 +95,7 @@ class Thymio:
         self.camera.resolution = (height, width)
         self.camera.framerate = 24
         image = np.empty((width, height, 3), dtype=np.uint8)
-        #Scalar set to make a greater distinction between left, mid and right
-        scalar = 1
+
         # to cancel out all small blobs in the color detection
         noise = 300000
         noiseCalibration = 200000
@@ -111,10 +110,11 @@ class Thymio:
             blue = cv2.bitwise_and(image, image, mask=full_mask)
 
             # To divide the numpy array in three sections
+            # Camera is upside down
             frameDivider = int(width/3)
-            left = np.sum(blue[:,0:frameDivider])
+            right = np.sum(blue[:,0:frameDivider])
             mid = np.sum(blue[:,frameDivider:(frameDivider*2)])
-            right = np.sum(blue[:,(frameDivider*2):])
+            left = np.sum(blue[:,(frameDivider*2):])
 
             # find the maxVal
             maxVal = max([left,right,mid])
@@ -133,11 +133,11 @@ class Thymio:
                 print(f'mid:  {mid} ######')
                 print(f'right:{right}')
 
-            if left == maxVal and maxVal > noise-noiseCalibration:
+            if left == maxVal and maxVal > noise + noiseCalibration:
                 self.enemyDirection = 'left'
             elif mid == maxVal and maxVal > noise:
                 self.enemyDirection = 'mid'
-            elif right == maxVal and maxVal > noise+noiseCalibration:
+            elif right == maxVal and maxVal > noise:
                 self.enemyDirection = 'right'
             else:
                 self.enemyDirection = 'none'
@@ -178,7 +178,7 @@ class Thymio:
         print("dbus error: %s" % str(e))
 
 
-## Write q table ##
+# ------------------ Writing Q Table -------------------------#
 def writeToQ(q):
     with open('QTableSeeker.txt','w') as w:
         w.write(str(q))
@@ -213,9 +213,9 @@ def rSeeker_doAction(action):
     elif action == 'B':
         robot.drive(-200,-200)
     elif action == 'L':
-        robot.drive(0,300)
+        robot.drive(0,400)
     elif action == 'R':
-        robot.drive(300,0)
+        robot.drive(400,0)
 
 def reward(stateParam,actionParam):
     if stateParam == 'mid' and actionParam == 'F':
@@ -224,6 +224,8 @@ def reward(stateParam,actionParam):
         return 5
     elif stateParam == 'right' and actionParam == 'R':
         return 5
+    elif stateParam == "none" and actionParam == "F":
+        return -9
     else:
         return -10
 
