@@ -8,6 +8,7 @@ import numpy as np
 import random
 from picamera import PiCamera
 import cv2 as cv2
+import test
 
 # initialize asebamedulla in background and wait 0.3s to let
 # asebamedulla startup
@@ -47,9 +48,15 @@ class Thymio:
         while True: 
             self.aseba.SendEventName("prox.comm.tx", [number])
 
+    ### ONLY TO BE USED IN AVOIDER ###
     def receiveInformation(self):
         while True: 
-            self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            if self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [1]:
+                self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            elif self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [2]:
+                self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            else: 
+                self.rx = [0]
 
     def LED(self, color): 
         if color == "red": 
@@ -170,6 +177,12 @@ class Thymio:
         # Currently only the error is logged. Maybe interrupt the mainloop here
         print("dbus error: %s" % str(e))
 
+
+## Write q table ##
+def writeQ(q): 
+    with open("seekerQTable.txt", "w") as write: 
+        write.write(q)
+
 # ------------------ Reinforcement Learning here -------------------------#
 
 rSeeker_states = ['left', 'right','mid','none']
@@ -182,17 +195,17 @@ Q = np.zeros((stateSpace, actionSpace))
 
 lr = 0.9
 gamma = 0.99
-epsilon = 0.2
+epsilon = 0.01
 
 def rSeeker_doAction(action):
     if action == 'F':
-        robot.drive(250,250)
+        robot.drive(450,450)
     elif action == 'B':
-        robot.drive(-100,-100)
+        robot.drive(-200,-200)
     elif action == 'L':
-        robot.drive(0,200)
+        robot.drive(0,300)
     elif action == 'R':
-        robot.drive(200,0)
+        robot.drive(300,0)
 
 def reward(stateParam,actionParam):
     if stateParam == 'mid' and actionParam == 'F':
@@ -218,10 +231,6 @@ def main():
     infraredCommSendThread.daemon = True
     infraredCommSendThread.start()
 
-    infraredCommRecieveThread = Thread(target=robot.receiveInformation)
-    infraredCommRecieveThread.daemon = True
-    infraredCommRecieveThread.start()
-
     cameraThread = Thread(target=robot.colorDetection)
     cameraThread.daemon = True
     cameraThread.start()
@@ -230,7 +239,6 @@ def main():
     while True:
         try:
             robot.LED('red') 
-            
             
             # TASK 1
             # Decrease epsilon slowly.....
@@ -294,6 +302,8 @@ if __name__ == '__main__':
         os.system("pkill -n asebamedulla")
         print("asebamodulla killed")
     finally:
+        print(Q)
+        writeQ(Q)
         robot.stopCamera()
         robot.LED('off')
         print("Stopping robot")
