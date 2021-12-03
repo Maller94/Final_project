@@ -230,8 +230,6 @@ def main():
     while True:
         try:
             robot.LED('red') 
-            
-            
             # TASK 1
             # Decrease epsilon slowly.....
             # TASK 2
