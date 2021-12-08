@@ -6,8 +6,8 @@ from time import sleep
 import os
 import numpy as np
 import random
-from picamera import PiCamera
-import cv2 as cv2
+from math import floor
+from adafruit_rplidar import RPLidar
 
 # initialize asebamedulla in background and wait 0.3s to let
 # asebamedulla startup
@@ -17,20 +17,26 @@ os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.3")
 class Thymio:
     def __init__(self):
         self.aseba = self.setup()
+        self.PORT_NAME = '/dev/ttyUSB0'
         self.sensorGroundValues = []
         self.rx = [0]
+        self.closestBeam = "none"
+        self.state = "flee"
+        #### Lidar ####
+        self.lidar = RPLidar(None, self.PORT_NAME)
+        # This is where we store the lidar readings
+        self.scan_data = [0]*360
+
         #### Infrared communication ####
         #this enables the prox.com communication channels
         self.aseba.SendEventName("prox.comm.enable", [1])
         #This enables the prox.comm rx value to zero, gets overwritten when receiving a value
         #self.aseba.SendEventName("prox.comm.tx",[0])
-        self.camera = PiCamera()
-        self.enemyDirection = ''
+        
 
     def drive(self, left_wheel_speed, right_wheel_speed):
         left_wheel = left_wheel_speed
         right_wheel = right_wheel_speed
-
         self.aseba.SendEventName("motor.target", [left_wheel, right_wheel])
 
     def stop(self):
@@ -45,7 +51,16 @@ class Thymio:
 
     def sendInformation(self, number):
         while True: 
-            self.aseba.SendEventName("prox.comm.tx", [number])
+            self.aseba.SendEventName("prox.comm.enable", [1])
+            sleep(0.2)
+            if self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [1]:
+                self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            elif self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [2]:
+                self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            else: 
+                self.rx = [0]
+            sleep(0.2)
+            self.aseba.SendEventName("prox.comm.enable", [0])
 
     def receiveInformation(self):
         while True: 
@@ -76,58 +91,40 @@ class Thymio:
             self.aseba.SendEventName("leds.bottom.left", (0,0,0))
             self.aseba.SendEventName("leds.bottom.right", (0,0,0))
             self.aseba.SendEventName("leds.top", (0,0,0))
-
-    def initCamera(self):
-        print("Camera test")
-        self.camera.start_preview()
-        sleep(1)
-
-    def colorDetection(self):
-        height = 480
-        width = 640
-        self.camera.resolution = (height, width)
-        self.camera.framerate = 24
-        image = np.empty((width, height, 3), dtype=np.uint8)
-        #Scalar set to make a greater distinction between left, mid and right
-        scalar = 2
-        # to cancel out all small blobs in the color detection
-        noise = 1000000
-        # boundaries blue
-        lower_range = np.array([90, 80, 20])
-        upper_range = np.array([140, 255, 255])
-
-        while True:
-            self.camera.capture(image, 'bgr')
-            hsvFrame = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
-            full_mask = cv2.inRange(hsvFrame, lower_range, upper_range)
-            blue = cv2.bitwise_and(image, image, mask=full_mask)
-
-            # To divide the numpy array in three sections
-            frameDivider = int(width/3)
-            right = np.sum(blue[:,0:frameDivider])
-            mid = np.sum(blue[:,frameDivider:(frameDivider*2)])
-            left = np.sum(blue[:,(frameDivider*2):])
-
-            # find the maxVal
-            maxVal = max([left,right,mid])
-
-            # print('')
-            # print('left: '+str(left))
-            # print('mid:  '+str(mid))
-            # print('right:'+str(right))
-
-            if left == maxVal and left > scalar*mid and left > scalar*right and maxVal > noise:
-                self.enemyDirection = 'left'
-            elif mid == maxVal and mid > scalar*left and mid > scalar*right and maxVal > noise:
-                self.enemyDirection = 'mid'
-            elif right == maxVal and right > scalar*mid and right > scalar*left and maxVal > noise:
-                self.enemyDirection = 'right'
-            else:
-                self.enemyDirection = 'none'
-
-    def stopCamera(self):
-        self.camera.stop_preview()
         
+    ############## LIDAR ###############################
+    def lidar_scan(self):
+        for scan in self.lidar.iter_scans():
+            # if(self.exit_now):
+            #    return
+            for (_, angle, distance) in scan:
+                if distance > 1000:
+                    self.scan_data[min([359, floor(angle)])] = 1000
+                else:
+                    self.scan_data[min([359, floor(angle)])] = distance
+
+    def lidar_stop(self):
+        self.lidar.stop()
+        self.lidar.disconnect()
+
+    def detection(self):
+        frontBeam = self.scan_data[135:224] 
+        rightBeam = self.scan_data[225:314] 
+        backBeam = self.scan_data[315:] + self.scan_data[0:44]
+        leftBeam = self.scan_data[45:134] 
+        
+        if sum(frontBeam) < sum(leftBeam) and sum(frontBeam) < sum(backBeam) and sum(frontBeam) < sum(rightBeam):
+            self.closestBeam = "front"
+        elif sum(leftBeam) < sum(frontBeam) and sum(leftBeam) < sum(backBeam) and sum(leftBeam) < sum(rightBeam):
+            self.closestBeam = "left"
+        elif sum(backBeam) < sum(frontBeam) and sum(backBeam) < sum(leftBeam) and sum(backBeam) < sum(rightBeam):
+            self.closestBeam = "back"
+        elif sum(rightBeam) < sum(frontBeam) and sum(rightBeam) < sum(leftBeam) and sum(rightBeam) < sum(backBeam):
+            self.closestBeam = "right"
+        #print("frontBeam: "+ str(frontBeam))
+        #print("rightBeam: "+ str(rightBeam))
+        #print("backBeam: "+ str(backBeam))
+        #print("leftBeam: "+ str(leftBeam))
 
 ############## Bus and aseba setup ######################################
 
@@ -166,11 +163,11 @@ class Thymio:
 
 def main():
     ####### Threads #######
-#    sensorGroundThread = Thread(target=robot.sensGround)
-#    sensorGroundThread.daemon = True
-#    sensorGroundThread.start()
+    sensorGroundThread = Thread(target=robot.sensGround)
+    sensorGroundThread.daemon = True
+    sensorGroundThread.start()
 
-    infraredCommSendThread = Thread(target=robot.sendInformation, args=([1])) ## args=(1) = seeker, args=(2) = avoider
+    infraredCommSendThread = Thread(target=robot.sendInformation, args=([2])) ## args=(1) = seeker, args=(2) = avoider
     infraredCommSendThread.daemon = True
     infraredCommSendThread.start()
 
@@ -178,31 +175,59 @@ def main():
     infraredCommRecieveThread.daemon = True
     infraredCommRecieveThread.start()
 
-    cameraThread = Thread(target=robot.colorDetection)
-    cameraThread.daemon = True
-    cameraThread.start()
+    lidar_thread = Thread(target=robot.lidar_scan)
+    lidar_thread.daemon = True
+    lidar_thread.start()
 
     # Controller #
     while True:
         try:
-            robot.LED('red') 
-            #print("0: " + str(robot.sensorGroundValues[0]))
-            #print("1: " + str(robot.sensorGroundValues[1]))
-            #print(robot.rx[0])
-            #robot.LED()
-            ####### Basic behavior #######
-            # print(robot.enemyDirection)
+            # FLEE
+            if robot.sensorGroundValues[0] > 998 and robot.sensorGroundValues[1] > 1003: 
+                robot.LED('blue') 
+                robot.detection()
+                print(robot.closestBeam)
+                #print("0: " + str(robot.sensorGroundValues[0]))
+                #print("1: " + str(robot.sensorGroundValues[1]))
+                
+                ####### Basic behavior #######
+                if robot.closestBeam == "left": 
+                    robot.drive(500, 0)
+                elif robot.closestBeam == "right": 
+                    robot.drive(0, 500)
+                elif robot.closestBeam == "back": 
+                    robot.drive(500, 500)
+                elif robot.closestBeam == "front": 
+                    robot.drive(-500, 500)
+                    sleep(0.5)
+                    robot.drive(500,500)
+                else: 
+                    robot.drive(300,300)
+            # AVOIDANCE
+            elif robot.sensorGroundValues[0] < 230: 
+                robot.drive(400, -400)
+                sleep(0.5) 
+            elif robot.sensorGroundValues[1] < 229: 
+                robot.drive(-400, 400)
+                sleep(0.5)
+            # DETECT SAFE ZONE
+            elif robot.sensorGroundValues[0] > 952 and robot.sensorGroundValues[0] < 998 and robot.sensorGroundValues[1] > 990 and robot.sensorGroundValues[1] < 1003:
+                robot.LED("green")
+                robot.drive(400, 400)
+                sleep(0.5)
+                robot.stop()
+            # LEAVE SAFE ZONE
+            elif robot.rx[0] == 2: 
+                robot.LED("blue")
+                robot.drive(400, 400)
+                sleep(0.5)
+            # CAUGHT
+            elif robot.rx[0] == 1: 
+                robot.stop()
+                robot.LED("purple")
+                robot.lidar_stop()
+            
 
-
-            if robot.enemyDirection == 'left':
-                robot.drive(100,-100)
-                print('left')
-            elif robot.enemyDirection == 'mid':
-                robot.drive(0,0)
-                print('mid')
-            elif robot.enemyDirection == 'right':
-                robot.drive(-100,100)
-                print('right')
         except: 
             print("setting up...")
             sleep(1)
@@ -214,12 +239,13 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print("Stopping robot")
+        robot.lidar_stop()
         robot.stop()
         sleep(1)
         os.system("pkill -n asebamedulla")
         print("asebamodulla killed")
     finally:
-        robot.stopCamera()
+        robot.lidar_stop()
         robot.LED('off')
         print("Stopping robot")
         robot.stop()
