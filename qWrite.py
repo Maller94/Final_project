@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 Q = np.array([[ -8.02,-8.02,6.98,-8.02],
             [ -7.03000002,-7.03,-7.03,7.97,],
@@ -9,11 +10,15 @@ def writeToQ(q):
     with open('QTable.txt','w') as w:
         w.write(str(q))
 
-writeToQ(Q)
+#writeToQ(Q)
 
 def readQ():
     with open('Qtable.txt','r') as r:
         QtableRead = np.array(r.read())
     return QtableRead
 
-print(readQ())
+if 2==3:
+    print(True)
+else:
+    pass
+
