@@ -25,6 +25,9 @@ class Thymio:
         self.lidar = RPLidar(None, self.PORT_NAME)
         # This is where we store the lidar readings
         self.scan_data = [0]*360
+        self.exit_now = False
+        self.robotState = 'drive'
+        self.lock = False
 
         #### Infrared communication ####
         #this enables the prox.com communication channels
@@ -50,6 +53,10 @@ class Thymio:
 
     def sendInformation(self, number):
         while True: 
+            self.aseba.SendEventName("prox.comm.tx", [number])
+
+    def receiveInformation(self):
+        while True: 
             self.aseba.SendEventName("prox.comm.enable", [1])
             sleep(0.2)
             if self.aseba.GetVariable("thymio-II", "prox.comm.rx") == [1]:
@@ -59,11 +66,7 @@ class Thymio:
             else: 
                 self.rx = [0]
             sleep(0.2)
-            self.aseba.SendEventName("prox.comm.enable", [0])
-
-    def receiveInformation(self):
-        while True: 
-            self.rx = self.aseba.GetVariable("thymio-II", "prox.comm.rx")            
+            self.aseba.SendEventName("prox.comm.enable", [0])           
 
     def LED(self, color): 
         if color == "red": 
@@ -93,24 +96,26 @@ class Thymio:
         
     ############## LIDAR ###############################
     def lidar_scan(self):
+        radius = 500
         for scan in self.lidar.iter_scans():
-            # if(self.exit_now):
-            #    return
+            if(self.exit_now):
+               return
             for (_, angle, distance) in scan:
-                if distance > 400:
-                    self.scan_data[min([359, floor(angle)])] = 400
+                if distance > radius:
+                    self.scan_data[min([359, floor(angle)])] = radius
                 else:
                     self.scan_data[min([359, floor(angle)])] = distance
 
     def lidar_stop(self):
         self.lidar.stop()
         self.lidar.disconnect()
+        self.exit_now = True
 
     def detection(self):
-        frontBeam = self.scan_data[135:224] 
-        rightBeam = self.scan_data[225:314] 
-        backBeam = self.scan_data[315:] + self.scan_data[0:44]
-        leftBeam = self.scan_data[45:134] 
+        frontBeam = self.scan_data[135:225] 
+        rightBeam = self.scan_data[225:315] 
+        backBeam = self.scan_data[315:] + self.scan_data[0:45]
+        leftBeam = self.scan_data[45:135] 
         
         if sum(frontBeam) < sum(leftBeam) and sum(frontBeam) < sum(backBeam) and sum(frontBeam) < sum(rightBeam):
             self.closestBeam = "front"
@@ -120,10 +125,13 @@ class Thymio:
             self.closestBeam = "back"
         elif sum(rightBeam) < sum(frontBeam) and sum(rightBeam) < sum(leftBeam) and sum(rightBeam) < sum(backBeam):
             self.closestBeam = "right"
-        #print("frontBeam: "+ str(frontBeam))
-        #print("rightBeam: "+ str(rightBeam))
-        #print("backBeam: "+ str(backBeam))
-        #print("leftBeam: "+ str(leftBeam))
+        else:
+            self.closestBeam = 'none'
+
+        # print("frontBeam: "+ str(sum(frontBeam)))
+        # print("rightBeam: "+ str(sum(rightBeam)))
+        # print("backBeam: "+ str(sum(backBeam)))
+        # print("leftBeam: "+ str(sum(leftBeam)))
 
 ############## Bus and aseba setup ######################################
 
@@ -162,80 +170,92 @@ class Thymio:
 
 def main():
     ####### Threads #######
-    for i in range(10): 
-        try: 
-            lidarThread = Thread(target=robot.lidar_scan)
-            lidarThread.daemon = True
-            lidarThread.start()
 
-            sensorGroundThread = Thread(target=robot.sensGround)
-            sensorGroundThread.daemon = True
-            sensorGroundThread.start()
+    lidarThread = Thread(target=robot.lidar_scan)
+    lidarThread.daemon = True
+    lidarThread.start()
 
-            infraredCommSendThread = Thread(target=robot.sendInformation, args=([2])) ## args=(1) = seeker, args=(2) = avoider
-            infraredCommSendThread.daemon = True
-            infraredCommSendThread.start()
+    sensorGroundThread = Thread(target=robot.sensGround)
+    sensorGroundThread.daemon = True
+    sensorGroundThread.start()
 
-            infraredCommRecieveThread = Thread(target=robot.receiveInformation)
-            infraredCommRecieveThread.daemon = True
-            infraredCommRecieveThread.start()
-            break
-        except: 
-            print("setting up threads")
-            sleep(1)
+    infraredCommSendThread = Thread(target=robot.sendInformation, args=([2])) ## args=(1) = seeker, args=(2) = avoider
+    infraredCommSendThread.daemon = True
+    infraredCommSendThread.start()
 
+    infraredCommRecieveThread = Thread(target=robot.receiveInformation)
+    infraredCommRecieveThread.daemon = True
+    infraredCommRecieveThread.start()
+
+    speed = 500
 
     # Controller #
     while True:
         try:
             # FLEE
-            #if robot.sensorGroundValues[0] > 998 and robot.sensorGroundValues[1] > 1003: 
-                robot.LED('blue') 
                 robot.detection()
-                print(robot.closestBeam)
                 #print("0: " + str(robot.sensorGroundValues[0]))
                 #print("1: " + str(robot.sensorGroundValues[1]))
                 
                 ####### Basic behavior #######
-                if robot.closestBeam == "left": 
-                    robot.drive(100, 0)
-                elif robot.closestBeam == "right": 
-                    robot.drive(0, 100)
-                elif robot.closestBeam == "back": 
-                    robot.drive(100, 100)
-                elif robot.closestBeam == "front": 
-                    robot.drive(-100, 100)
+                #print(robot.closestBeam)
+                # TAPE AVOIDANCE
+                if robot.sensorGroundValues[0] < 230 and robot.robotState != 'avoidLeft': 
+                    robot.robotState = 'avoidLeft'
+                elif robot.sensorGroundValues[1] < 229 and robot.robotState != 'avoidRight': 
+                    robot.robotState = 'avoidRight'
+                # # DETECT SAFE ZONE
+                elif robot.lock == False and robot.sensorGroundValues[0] > 230 and robot.sensorGroundValues[0] < 1006 and robot.sensorGroundValues[1] > 229 and robot.sensorGroundValues[1] < 1010:
+                    robot.lock = True
+                    robot.robotState = 'moveIntoSafeZone'
+                # LEAVE SAFE ZONE
+                elif robot.rx[0] == 2 and robot.robotState == 'safeZone':
+                    robot.drive(400, 400)
+                    sleep(4)
+                    robot.robotState = 'drive'
+                    robot.lock = False
+                # CAUGHT
+                elif robot.robotState != 'caught' and robot.robotState != 'safeZone' and robot.rx[0] == 1:
+                    robot.robotState = 'caught'
+
+                print(robot.robotState)
+                # State Behavior
+                if robot.robotState == 'drive':
+                    robot.LED('blue')
+                    if robot.closestBeam == "left": 
+                        robot.drive(speed, 0)
+                    elif robot.closestBeam == "right": 
+                        robot.drive(0, speed)
+                    elif robot.closestBeam == "back": 
+                        robot.drive(speed, speed)
+                    elif robot.closestBeam == "front": 
+                        robot.drive(-speed, speed)
+                        sleep(0.5)
+                        robot.drive(speed,speed)
+                    elif robot.closestBeam == "none": 
+                        robot.drive(0,0)
+                elif robot.robotState == 'avoidLeft':
+                    robot.drive(400, -400)
                     sleep(0.5)
-                    robot.drive(100,100)
-                else: 
-                    robot.drive(100,100)
-                
-                sleep(1)
-            # # AVOIDANCE
-            # elif robot.sensorGroundValues[0] < 230: 
-            #     robot.drive(400, -400)
-            #     sleep(0.5) 
-            # elif robot.sensorGroundValues[1] < 229: 
-            #     robot.drive(-400, 400)
-            #     sleep(0.5)
-            # # DETECT SAFE ZONE
-            # elif robot.sensorGroundValues[0] > 230 and robot.sensorGroundValues[0] < 1006 and robot.sensorGroundValues[1] > 229 and robot.sensorGroundValues[1] < 1010:
-            #     robot.LED("green")
-            #     robot.drive(300, 300)
-            #     sleep(0.5)
-            #     robot.stop()
-            # # LEAVE SAFE ZONE
-            # elif robot.rx[0] == 2: 
-            #     robot.LED("blue")
-            #     robot.drive(400, 400)
-            #     sleep(1.5)
-            # # CAUGHT
-            # elif robot.rx[0] == 1: 
-            #     robot.stop()
-            #     robot.LED("purple")
-            #     robot.lidar_stop()
-            #     break
-    
+                    robot.robotState = 'drive'
+                elif robot.robotState == 'avoidRight':
+                    robot.drive(-400, 400)
+                    sleep(0.5)
+                    robot.robotState = 'drive'
+                elif robot.robotState == 'moveIntoSafeZone':
+                    robot.LED("green")
+                    robot.drive(500, 500)
+                    sleep(0.75)
+                    robot.stop()
+                    robot.robotState = 'safeZone'
+                elif robot.robotState == 'safeZone':
+                    robot.LED("green")
+                    robot.stop()
+                    print(robot.rx[0])
+                elif robot.robotState == 'caught':
+                    robot.stop()
+                    robot.LED("purple")
+                    robot.lidar_stop()
         except: 
             print("setting up...")
             sleep(1)
@@ -247,15 +267,11 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print("Stopping robot")
-        robot.lidar_stop()
-        robot.stop()
-        sleep(1)
-        os.system("pkill -n asebamedulla")
-        print("asebamodulla killed")
     finally:
         robot.lidar_stop()
         robot.LED('off')
         print("Stopping robot")
+        robot.exit_now = True
         robot.stop()
         sleep(1)
         os.system("pkill -n asebamedulla")
