@@ -41,8 +41,8 @@ class Thymio:
             # if(self.exit_now):
             #    return
             for (_, angle, distance) in scan:
-                if distance > 1000:
-                    self.scan_data[min([359, floor(angle)])] = 1000
+                if distance > 400:
+                    self.scan_data[min([359, floor(angle)])] = 400
                 else:
                     self.scan_data[min([359, floor(angle)])] = distance
 

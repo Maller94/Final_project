@@ -9,9 +9,9 @@ import random
 from math import floor
 from adafruit_rplidar import RPLidar
 
-# initialize asebamedulla in background and wait 0.3s to let
+# initialize asebamedulla in background and wait 1s to let
 # asebamedulla startup
-os.system("(asebamedulla ser:name=Thymio-II &) && sleep 0.3")
+os.system("(asebamedulla ser:name=Thymio-II &) && sleep 1")
 
 
 class Thymio:
@@ -21,7 +21,6 @@ class Thymio:
         self.sensorGroundValues = []
         self.rx = [0]
         self.closestBeam = "none"
-        self.state = "flee"
         #### Lidar ####
         self.lidar = RPLidar(None, self.PORT_NAME)
         # This is where we store the lidar readings
@@ -98,8 +97,8 @@ class Thymio:
             # if(self.exit_now):
             #    return
             for (_, angle, distance) in scan:
-                if distance > 1000:
-                    self.scan_data[min([359, floor(angle)])] = 1000
+                if distance > 400:
+                    self.scan_data[min([359, floor(angle)])] = 400
                 else:
                     self.scan_data[min([359, floor(angle)])] = distance
 
@@ -163,27 +162,34 @@ class Thymio:
 
 def main():
     ####### Threads #######
-    sensorGroundThread = Thread(target=robot.sensGround)
-    sensorGroundThread.daemon = True
-    sensorGroundThread.start()
+    for i in range(10): 
+        try: 
+            lidarThread = Thread(target=robot.lidar_scan)
+            lidarThread.daemon = True
+            lidarThread.start()
 
-    infraredCommSendThread = Thread(target=robot.sendInformation, args=([2])) ## args=(1) = seeker, args=(2) = avoider
-    infraredCommSendThread.daemon = True
-    infraredCommSendThread.start()
+            sensorGroundThread = Thread(target=robot.sensGround)
+            sensorGroundThread.daemon = True
+            sensorGroundThread.start()
 
-    infraredCommRecieveThread = Thread(target=robot.receiveInformation)
-    infraredCommRecieveThread.daemon = True
-    infraredCommRecieveThread.start()
+            infraredCommSendThread = Thread(target=robot.sendInformation, args=([2])) ## args=(1) = seeker, args=(2) = avoider
+            infraredCommSendThread.daemon = True
+            infraredCommSendThread.start()
 
-    lidar_thread = Thread(target=robot.lidar_scan)
-    lidar_thread.daemon = True
-    lidar_thread.start()
+            infraredCommRecieveThread = Thread(target=robot.receiveInformation)
+            infraredCommRecieveThread.daemon = True
+            infraredCommRecieveThread.start()
+            break
+        except: 
+            print("setting up threads")
+            sleep(1)
+
 
     # Controller #
     while True:
         try:
             # FLEE
-            if robot.sensorGroundValues[0] > 998 and robot.sensorGroundValues[1] > 1003: 
+            #if robot.sensorGroundValues[0] > 998 and robot.sensorGroundValues[1] > 1003: 
                 robot.LED('blue') 
                 robot.detection()
                 print(robot.closestBeam)
@@ -192,42 +198,44 @@ def main():
                 
                 ####### Basic behavior #######
                 if robot.closestBeam == "left": 
-                    robot.drive(500, 0)
+                    robot.drive(100, 0)
                 elif robot.closestBeam == "right": 
-                    robot.drive(0, 500)
+                    robot.drive(0, 100)
                 elif robot.closestBeam == "back": 
-                    robot.drive(500, 500)
+                    robot.drive(100, 100)
                 elif robot.closestBeam == "front": 
-                    robot.drive(-500, 500)
+                    robot.drive(-100, 100)
                     sleep(0.5)
-                    robot.drive(500,500)
+                    robot.drive(100,100)
                 else: 
-                    robot.drive(300,300)
-            # AVOIDANCE
-            elif robot.sensorGroundValues[0] < 230: 
-                robot.drive(400, -400)
-                sleep(0.5) 
-            elif robot.sensorGroundValues[1] < 229: 
-                robot.drive(-400, 400)
-                sleep(0.5)
-            # DETECT SAFE ZONE
-            elif robot.sensorGroundValues[0] > 952 and robot.sensorGroundValues[0] < 998 and robot.sensorGroundValues[1] > 990 and robot.sensorGroundValues[1] < 1003:
-                robot.LED("green")
-                robot.drive(400, 400)
-                sleep(0.5)
-                robot.stop()
-            # LEAVE SAFE ZONE
-            elif robot.rx[0] == 2: 
-                robot.LED("blue")
-                robot.drive(400, 400)
-                sleep(0.5)
-            # CAUGHT
-            elif robot.rx[0] == 1: 
-                robot.stop()
-                robot.LED("purple")
-                robot.lidar_stop()
-            
-
+                    robot.drive(100,100)
+                
+                sleep(1)
+            # # AVOIDANCE
+            # elif robot.sensorGroundValues[0] < 230: 
+            #     robot.drive(400, -400)
+            #     sleep(0.5) 
+            # elif robot.sensorGroundValues[1] < 229: 
+            #     robot.drive(-400, 400)
+            #     sleep(0.5)
+            # # DETECT SAFE ZONE
+            # elif robot.sensorGroundValues[0] > 230 and robot.sensorGroundValues[0] < 1006 and robot.sensorGroundValues[1] > 229 and robot.sensorGroundValues[1] < 1010:
+            #     robot.LED("green")
+            #     robot.drive(300, 300)
+            #     sleep(0.5)
+            #     robot.stop()
+            # # LEAVE SAFE ZONE
+            # elif robot.rx[0] == 2: 
+            #     robot.LED("blue")
+            #     robot.drive(400, 400)
+            #     sleep(1.5)
+            # # CAUGHT
+            # elif robot.rx[0] == 1: 
+            #     robot.stop()
+            #     robot.LED("purple")
+            #     robot.lidar_stop()
+            #     break
+    
         except: 
             print("setting up...")
             sleep(1)
