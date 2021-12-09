@@ -87,19 +87,8 @@ class Thymio:
 
 def main():
     try: 
-        while True: 
-            robot.LED("red")
-            sleep(1)
-            robot.LED("green")
-            sleep(1)
-            robot.LED("blue")
-            sleep(1)
-            robot.LED("yellow")
-            sleep(1)
-            robot.LED("purple")
-            sleep(1)
-            robot.LED("off")
-            break
+        sleep(1)
+        robot.LED("blue")
     except:
         "setting up"
         sleep(1)

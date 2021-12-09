@@ -27,6 +27,7 @@ class Thymio:
         #self.aseba.SendEventName("prox.comm.tx",[0])
         self.camera = PiCamera()
         self.enemyDirection = ''
+        self.state = 'seek'
 
     def drive(self, left_wheel_speed, right_wheel_speed):
         left_wheel = left_wheel_speed
@@ -97,8 +98,8 @@ class Thymio:
         image = np.empty((width, height, 3), dtype=np.uint8)
 
         # to cancel out all small blobs in the color detection
-        #noise = 300000
-        #noiseCalibration = 200000
+        noise = 300000
+        noiseCalibration = 200000
         # boundaries blue
         lower_range = np.array([90, 80, 20])
         upper_range = np.array([140, 255, 255])
@@ -108,7 +109,6 @@ class Thymio:
             hsvFrame = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
             full_mask = cv2.inRange(hsvFrame, lower_range, upper_range)
             blue = cv2.bitwise_and(image, image, mask=full_mask)
-            blue[blue > 0] = 1 
 
             # To divide the numpy array in three sections
             # Camera is upside down
@@ -134,11 +134,11 @@ class Thymio:
                 print(f'mid:  {mid} ######')
                 print(f'right:{right}')
 
-            if left == maxVal:
+            if left == maxVal and maxVal > noise + noiseCalibration:
                 self.enemyDirection = 'left'
-            elif mid == maxVal:
+            elif mid == maxVal and maxVal > noise:
                 self.enemyDirection = 'mid'
-            elif right == maxVal:
+            elif right == maxVal and maxVal > noise:
                 self.enemyDirection = 'right'
             else:
                 self.enemyDirection = 'none'
@@ -199,14 +199,14 @@ actionSpace = len(rSeeker_actions)
 
 Q = np.zeros((stateSpace, actionSpace))
 
-# if os.stat('QTableSeeker.txt').st_size != 0:
-#     Q = readQ()
-# else:
-#     pass
+if os.stat('QTableSeeker.txt').st_size != 0:
+    Q = readQ()
+else:
+    pass
 
 lr = 0.9
 gamma = 0.99
-epsilon = 0.2
+epsilon = 0.1
 
 def rSeeker_doAction(action):
     if action == 'F':
@@ -214,21 +214,23 @@ def rSeeker_doAction(action):
     elif action == 'B':
         robot.drive(-200,-200)
     elif action == 'L':
-        robot.drive(0,300)
+        robot.drive(0,400)
     elif action == 'R':
-        robot.drive(300,0)
+        robot.drive(400,0)
 
 def reward(stateParam,actionParam):
     if stateParam == 'mid' and actionParam == 'F':
         return 100
     elif stateParam == 'left' and actionParam == 'L':
-        return 2
+        return 5
     elif stateParam == 'right' and actionParam == 'R':
-        return 2
-    elif actionParam == 'B':
-        return -100
+        return 5
+    elif stateParam == "none" and actionParam == "F":
+        return -9
     else:
         return -10
+
+
 
 # ------------------ Main loop here -------------------------
 
@@ -246,29 +248,24 @@ def main():
     cameraThread.daemon = True
     cameraThread.start()
 
-    # Time to start
-    sleep(2)
+
 
     # Controller #
     while True:
         try:
-            # Change LEDS
-            if (robot.sensorGroundValues[0] > 230 and robot.sensorGroundValues[0] < 1010) and (robot.sensorGroundValues[1] > 229 and robot.sensorGroundValues[1] < 1010):
-                robot.LED('yellow')
-            else:
-                robot.LED('red')
 
-            if robot.sensorGroundValues[0] < 200:
-                robot.drive(400,-400)
-                sleep(0.75)
-            elif robot.sensorGroundValues[1] < 200:
-                robot.drive(-400,400)
-                sleep(0.75)
+            if robot.sensorGroundValues[0] < 200 or robot.sensorGroundValues[0] < 200:
+                robot.state = 'avoidance'
             else:
+                robot.state = 'seek'
+
+            if robot.state == 'seek':
                 global epsilon
-                if epsilon > 0.001:
-                    epsilon -= 0.00004
-                    
+                robot.LED('red') 
+
+                if epsilon > 0.03:
+                    epsilon -= 0.0001
+
                 # Set the percent you want to explore
                 if random.uniform(0, 1) < epsilon:
                     #Explore: select a random action
@@ -291,6 +288,7 @@ def main():
                     new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
                     # Update Q-table
                     Q[state_coord][rand_num] = Q[state_coord][rand_num] + lr * (reward(state, rand_choice) + gamma * new_q_max - Q[state_coord][rand_num])
+
                 else:
                     #Exploit: select the action with max value (future reward)
                     # Retrieves the current state based on the sensor output s0 and s4
@@ -309,6 +307,17 @@ def main():
                     new_q_max = np.where(Q[new_state_coord] == np.max(Q[new_state_coord]))[0][0]
                     # Updates the Q-table 
                     Q[state_coord][q_max] = Q[state_coord][q_max] + lr * (reward(state, rSeeker_actions[q_max]) + gamma * new_q_max - Q[state_coord][q_max])
+            else:
+                robot.drive(-100,-100)
+                sleep(0.5)
+                if random.randint(0,1) == 1:
+                    robot.drive(-200,200)
+                else:
+                    robot.drive(200,-200)
+                
+                if robot.sensorGroundValues[0] > 200 or robot.sensorGroundValues[0] > 200:
+                    robot.state = 'seek'
+
         except: 
             print("setting up...")
             sleep(1)
