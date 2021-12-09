@@ -27,6 +27,7 @@ class Thymio:
         #self.aseba.SendEventName("prox.comm.tx",[0])
         self.camera = PiCamera()
         self.enemyDirection = ''
+        self.sensorHorizontalValues = []
 
     def drive(self, left_wheel_speed, right_wheel_speed):
         left_wheel = left_wheel_speed
@@ -43,6 +44,11 @@ class Thymio:
         while True:
             prox_ground = self.aseba.GetVariable("thymio-II", "prox.ground.delta")
             self.sensorGroundValues = prox_ground
+
+    def sensHorizontal(self):
+        while True:
+            prox_horizontal = self.aseba.GetVariable("thymio-II", "prox.horizontal")
+            self.sensorHorizontalValues = prox_horizontal
 
     def sendInformation(self, number):
         while True: 
@@ -120,19 +126,19 @@ class Thymio:
             # find the maxVal
             maxVal = max([left,right,mid])
 
-            print('')
-            if left == maxVal:
-                print(f'left: {left} ######')
-                print(f'mid:  {mid}')
-                print(f'right:{right}')
-            elif right == maxVal:
-                print(f'left: {left}')
-                print(f'mid:  {mid}')
-                print(f'right:{right} ######')
-            elif mid == maxVal:
-                print(f'left: {left}')
-                print(f'mid:  {mid} ######')
-                print(f'right:{right}')
+            # print('')
+            # if left == maxVal:
+            #     print(f'left: {left} ######')
+            #     print(f'mid:  {mid}')
+            #     print(f'right:{right}')
+            # elif right == maxVal:
+            #     print(f'left: {left}')
+            #     print(f'mid:  {mid}')
+            #     print(f'right:{right} ######')
+            # elif mid == maxVal:
+            #     print(f'left: {left}')
+            #     print(f'mid:  {mid} ######')
+            #     print(f'right:{right}')
 
             if left == maxVal:
                 self.enemyDirection = 'left'
@@ -180,14 +186,14 @@ class Thymio:
 
 
 # ------------------ Writing Q Table -------------------------#
-def writeToQ(q):
-    with open('QTableSeeker.txt','w') as w:
-        w.write(str(q))
+# def writeToQ(q):
+#     with open('QTableSeeker.txt','w') as w:
+#         w.write(str(q))
 
-def readQ():
-    with open('QTableSeeker.txt','r') as r:
-        QtableRead = np.array(r.read())
-    return QtableRead
+# def readQ():
+#     with open('QTableSeeker.txt','r') as r:
+#         QtableRead = np.array(r.read())
+#     return QtableRead
 
 # ------------------ Reinforcement Learning here -------------------------#
 
@@ -198,11 +204,6 @@ rSeeker_actions = ['F','B', 'L', 'R']
 actionSpace = len(rSeeker_actions)
 
 Q = np.zeros((stateSpace, actionSpace))
-
-# if os.stat('QTableSeeker.txt').st_size != 0:
-#     Q = readQ()
-# else:
-#     pass
 
 lr = 0.9
 gamma = 0.99
@@ -238,6 +239,10 @@ def main():
     sensorGroundThread.daemon = True
     sensorGroundThread.start()
 
+    sensorHorizontalThread = Thread(target=robot.sensHorizontal)
+    sensorHorizontalThread.daemon = True
+    sensorHorizontalThread.start()
+
     infraredCommSendThread = Thread(target=robot.sendInformation, args=([1])) ## args=(1) = seeker, args=(2) = avoider
     infraredCommSendThread.daemon = True
     infraredCommSendThread.start()
@@ -262,6 +267,9 @@ def main():
                 robot.drive(400,-400)
                 sleep(0.75)
             elif robot.sensorGroundValues[1] < 200:
+                robot.drive(-400,400)
+                sleep(0.75)
+            elif robot.sensorHorizontalValues[1] > 750 or robot.sensorHorizontalValues[3] > 750:
                 robot.drive(-400,400)
                 sleep(0.75)
             else:
@@ -326,7 +334,6 @@ if __name__ == '__main__':
         print("asebamodulla killed")
     finally:
         print(Q)
-        writeToQ(Q)
         robot.stopCamera()
         robot.LED('off')
         print("Stopping robot")
