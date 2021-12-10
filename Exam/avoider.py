@@ -93,7 +93,16 @@ class Thymio:
             self.aseba.SendEventName("leds.bottom.left", (0,0,0))
             self.aseba.SendEventName("leds.bottom.right", (0,0,0))
             self.aseba.SendEventName("leds.top", (0,0,0))
-        
+    
+    def disable_sensor_leds(self):
+        self.aseba.SendEventName("leds.temperature", [0])
+        self.aseba.SendEventName("leds.circle", [0])
+        self.aseba.SendEventName("leds.prox.h", [0, 0, 0, 0, 0])
+        self.aseba.SendEventName("leds.prox.v", [0, 0])
+        self.aseba.SendEventName("leds.buttons", [0])
+        self.aseba.SendEventName("leds.sound", [0])
+        self.aseba.SendEventName("leds.rc", [0])
+
     ############## LIDAR ###############################
     def lidar_scan(self):
         radius = 500
@@ -174,7 +183,8 @@ def main():
     lidarThread = Thread(target=robot.lidar_scan)
     lidarThread.daemon = True
     lidarThread.start()
-
+    sleep(0.5)
+    
     sensorGroundThread = Thread(target=robot.sensGround)
     sensorGroundThread.daemon = True
     sensorGroundThread.start()
@@ -188,7 +198,7 @@ def main():
     infraredCommRecieveThread.start()
 
     speed = 500
-
+    robot.disable_sensor_leds()
     # Controller #
     while True:
         try:
@@ -200,12 +210,12 @@ def main():
                 ####### Basic behavior #######
                 #print(robot.closestBeam)
                 # TAPE AVOIDANCE
-                if robot.sensorGroundValues[0] < 230 and robot.robotState != 'avoidLeft': 
+                if robot.sensorGroundValues[0] < 260 and robot.robotState != 'avoidLeft': 
                     robot.robotState = 'avoidLeft'
-                elif robot.sensorGroundValues[1] < 229 and robot.robotState != 'avoidRight': 
+                elif robot.sensorGroundValues[1] < 260 and robot.robotState != 'avoidRight': 
                     robot.robotState = 'avoidRight'
                 # # DETECT SAFE ZONE
-                elif robot.lock == False and robot.sensorGroundValues[0] > 230 and robot.sensorGroundValues[0] < 1006 and robot.sensorGroundValues[1] > 229 and robot.sensorGroundValues[1] < 1010:
+                elif robot.lock == False and robot.sensorGroundValues[0] > 260 and robot.sensorGroundValues[0] < 1007 and robot.sensorGroundValues[1] > 260 and robot.sensorGroundValues[1] < 1007:
                     robot.lock = True
                     robot.robotState = 'moveIntoSafeZone'
                 # LEAVE SAFE ZONE
