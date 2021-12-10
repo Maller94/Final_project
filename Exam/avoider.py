@@ -215,7 +215,7 @@ def main():
                 elif robot.sensorGroundValues[1] < 260 and robot.robotState != 'avoidRight': 
                     robot.robotState = 'avoidRight'
                 # # DETECT SAFE ZONE
-                elif robot.lock == False and robot.sensorGroundValues[0] > 260 and robot.sensorGroundValues[0] < 1007 and robot.sensorGroundValues[1] > 260 and robot.sensorGroundValues[1] < 1007:
+                elif robot.lock == False and robot.sensorGroundValues[0] > 400 and robot.sensorGroundValues[0] < 990 and robot.sensorGroundValues[1] > 400 and robot.sensorGroundValues[1] < 990:
                     robot.lock = True
                     robot.robotState = 'moveIntoSafeZone'
                 # LEAVE SAFE ZONE
@@ -240,17 +240,17 @@ def main():
                         robot.drive(speed, speed)
                     elif robot.closestBeam == "front": 
                         robot.drive(-speed, speed)
-                        sleep(0.5)
+                        sleep(0.25)
                         robot.drive(speed,speed)
                     elif robot.closestBeam == "none": 
-                        robot.drive(0,0)
+                        robot.drive(200,200)
                 elif robot.robotState == 'avoidLeft':
-                    robot.drive(400, -400)
+                    robot.drive(400, -100)
                     sleep(0.5)
                     robot.robotState = 'drive'
                 elif robot.robotState == 'avoidRight':
-                    robot.drive(-400, 400)
-                    sleep(0.5)
+                    robot.drive(-400, 100)
+                    sleep(0.5)                    
                     robot.robotState = 'drive'
                 elif robot.robotState == 'moveIntoSafeZone':
                     robot.LED("green")

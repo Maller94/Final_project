@@ -103,8 +103,7 @@ class Thymio:
         image = np.empty((width, height, 3), dtype=np.uint8)
 
         # to cancel out all small blobs in the color detection
-        #noise = 300000
-        #noiseCalibration = 200000
+        noise = 20
         # boundaries blue
         lower_range = np.array([90, 80, 20])
         upper_range = np.array([140, 255, 255])
@@ -140,19 +139,27 @@ class Thymio:
             #     print(f'mid:  {mid} ######')
             #     print(f'right:{right}')
 
-            if left == maxVal:
+            if left == maxVal and maxVal > noise:
                 self.enemyDirection = 'left'
-            elif mid == maxVal:
+            elif mid == maxVal and maxVal > noise:
                 self.enemyDirection = 'mid'
-            elif right == maxVal:
+            elif right == maxVal and maxVal > noise:
                 self.enemyDirection = 'right'
             else:
                 self.enemyDirection = 'none'
 
     def stopCamera(self):
         self.camera.stop_preview()
+    
+    def disable_sensor_leds(self):
+        self.aseba.SendEventName("leds.temperature", [0])
+        self.aseba.SendEventName("leds.circle", [0])
+        self.aseba.SendEventName("leds.prox.h", [0, 0, 0, 0, 0])
+        self.aseba.SendEventName("leds.prox.v", [0, 0])
+        self.aseba.SendEventName("leds.buttons", [0])
+        self.aseba.SendEventName("leds.sound", [0])
+        self.aseba.SendEventName("leds.rc", [0])
         
-
 ############## Bus and aseba setup ######################################
 
     def setup(self):
@@ -211,7 +218,7 @@ epsilon = 0.2
 
 def rSeeker_doAction(action):
     if action == 'F':
-        robot.drive(450,450)
+        robot.drive(500,500)
     elif action == 'B':
         robot.drive(-200,-200)
     elif action == 'L':
@@ -251,6 +258,9 @@ def main():
     cameraThread.daemon = True
     cameraThread.start()
 
+    # Disable red leds
+    robot.disable_sensor_leds()
+
     # Time to start
     sleep(2)
 
@@ -258,18 +268,18 @@ def main():
     while True:
         try:
             # Change LEDS
-            if (robot.sensorGroundValues[0] > 230 and robot.sensorGroundValues[0] < 1010) and (robot.sensorGroundValues[1] > 229 and robot.sensorGroundValues[1] < 1010):
+            if (robot.sensorGroundValues[0] > 400 and robot.sensorGroundValues[0] < 990) and (robot.sensorGroundValues[1] > 400 and robot.sensorGroundValues[1] < 990):
                 robot.LED('yellow')
             else:
                 robot.LED('red')
 
-            if robot.sensorGroundValues[0] < 200:
+            if robot.sensorGroundValues[0] < 400:
                 robot.drive(400,-400)
                 sleep(0.75)
-            elif robot.sensorGroundValues[1] < 200:
+            elif robot.sensorGroundValues[1] < 400:
                 robot.drive(-400,400)
                 sleep(0.75)
-            elif robot.sensorHorizontalValues[1] > 750 or robot.sensorHorizontalValues[3] > 750:
+            elif robot.sensorHorizontalValues[1] > 1500 or robot.sensorHorizontalValues[3] > 1500:
                 robot.drive(-400,400)
                 sleep(0.75)
             else:
@@ -290,7 +300,6 @@ def main():
                     rSeeker_doAction(rand_choice)
                     # retrieve new state based on sensor outputs
                     new_state = robot.enemyDirection
-
                     # Retrieves the index position of the given state
                     state_coord = rSeeker_states.index(state) 
                     # Retrieves the index position of the NEW state
